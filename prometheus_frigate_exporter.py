@@ -52,7 +52,7 @@ class CustomCollector(object):
 
         detector_inference_speed = GaugeMetricFamily('frigate_detector_inference_speed_seconds', 'Time spent running object detection in seconds.', labels=['name'])
         detector_pid = GaugeMetricFamily('frigate_detector_pid', 'PID for the shared process that runs object detection on the detector', labels=['name'])
-        
+
         for d in data['detectors']:
             detector_inference_speed.add_metric([d], data['detectors'][d]['inference_speed']/1000.0) # ms to seconds
             detector_pid.add_metric([d], data['detectors'][d]['pid'])
@@ -113,10 +113,12 @@ class CustomCollector(object):
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
-    if len(sys.argv) < 1:
-        logging.info("Provide Frigate stats url, e.g. http://<your-frigate-ip>:5000/api/stats")
+    try:
+        REGISTRY.register(CustomCollector(sys.argv[1]))
+    except IndexError:
+        logging.error("Provide Frigate stats url as environment variable, e.g. FRIGATE_STATS_URL=http://<your-frigate-ip>:5000/api/stats")
+        exit()
 
-    REGISTRY.register(CustomCollector(sys.argv[1]))
     start_http_server(9100)
 
     logging.info('Started: ' + sys.argv[1])
