@@ -67,7 +67,7 @@ If you don't already have Prometheus set up to scrape the `prometheus-frigate-ex
       prom/prometheus
   ```
 
-To see if Prometheus is scraping the Frigate exporter, go to Prometheus targets page [http://<your-prometheus-ip>:9090/targets](http://<your-prometheus-ip>:9090/targets) and look for `UP` for `prometheus_frigate_exporter` job.
+To see if Prometheus is scraping the Frigate exporter, go to Prometheus targets page [http://your-prometheus-ip:9090/targets](http://your-prometheus-ip:9090/targets) and look for `UP` for `prometheus_frigate_exporter` job.
 
 ### Setup Grafana
 
@@ -83,12 +83,12 @@ If you don't already have Grafana set up,
         grafana/grafana-oss
     ```
 
-- Go to Grafana [http://<your-grafana-ip>:3000](http://<your-grafana-ip>:3000) (might take a few minutes first run). Use admin:admin to log in
-- Go to [http://<your-grafana-ip>:3000/datasources](http://<your-grafana-ip>:3000/datasources)
+- Go to Grafana [http://your-grafana-ip:3000](http://your-grafana-ip:3000) (might take a few minutes first run). Use admin:admin to log in
+- Go to [http://your-grafana-ip:3000/datasources](http://your-grafana-ip:3000/datasources)
   - add Prometheus datasource
   - Set Prometheus URL `http://<your-prometheus-frigate-exporter-ip>:9090`
   - Click `Save and Test` to check if connected
-- Go to [http://<your-grafana-ip>:3000/dashboards](http://<your-grafana-ip>:3000/dashboards)
+- Go to [http://your-grafana-ip:3000/dashboards](http://your-grafana-ip:3000/dashboards)
   - New -> Import
   - Enter in `Import via grafana.com`: `18226` (id can be found at [Grafana Dashboard](https://grafana.com/grafana/dashboards/18226-frigate/)) and click Load
   - Set the datasource as Prometheus instance set up before then click Import
