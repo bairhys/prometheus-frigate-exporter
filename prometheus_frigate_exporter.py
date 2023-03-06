@@ -20,7 +20,7 @@ def add_metric(metric, label, stats, key, multiplier=1.0):
 class CustomCollector(object):
 
     def __init__(self, _url):
-        self.url = _url
+        self.stats_url = _url
         self.process_stats = {}
 
     def add_metric_process(self, metric, stats, camera_name, pid_name, process_name, cpu_or_memory, process_type):
@@ -33,7 +33,7 @@ class CustomCollector(object):
             pass
 
     def collect(self):
-        stats = json.loads(urlopen(self.url).read())
+        stats = json.loads(urlopen(self.stats_url).read())
         self.process_stats = stats['cpu_usages']
 
         # process stats for cameras, detectors and other
