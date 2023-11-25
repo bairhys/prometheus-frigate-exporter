@@ -35,6 +35,7 @@ class CustomCollector(object):
     def collect(self):
         stats = json.loads(urlopen(self.stats_url).read())
         self.process_stats = stats['cpu_usages']
+        self.cameras = stats['cameras']
 
         # process stats for cameras, detectors and other
         cpu_usages = GaugeMetricFamily('frigate_cpu_usage_percent', 'Process CPU usage %',
@@ -54,7 +55,7 @@ class CustomCollector(object):
         detection_enabled = GaugeMetricFamily('frigate_detection_enabled', 'Detection enabled for camera',
                                               labels=['camera_name'])
 
-        for camera_name, camera_stats in stats.items():
+        for camera_name, camera_stats in self.cameras.items():
             add_metric(camera_fps, camera_name, camera_stats, 'camera_fps')
             add_metric(detection_fps, camera_name, camera_stats, 'detection_fps')
             add_metric(process_fps, camera_name, camera_stats, 'process_fps')
