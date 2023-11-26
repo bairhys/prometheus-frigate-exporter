@@ -201,7 +201,7 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
     try:
-        url = sys.argv[1]
+        url = str(os.environ.get('FRIGATE_STATS_URL', 'http://localhost:5000/api/stats'))
         REGISTRY.register(CustomCollector(url))
     except IndexError:
         logging.error(
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 9100))
     start_http_server(port)
 
-    logging.info('Started, Frigate API URL: ' + sys.argv[1])
+    logging.info('Started, Frigate API URL: ' + url)
     logging.info('Metrics at: http://localhost:' + str(port) + '/metrics')
 
     while True:
