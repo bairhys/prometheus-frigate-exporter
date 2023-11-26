@@ -2,7 +2,7 @@
 
 This is a docker container that runs a Prometheus exporter for [Frigate](https://frigate.video/) stats.
 
-Tested with ghcr.io/blakeblackshear/frigate:0.12.0-beta8 docker image with a single Intel OpenVINO detector.
+Tested with 0.12.0 and 0.13.0 Beta 5 Frigate docker images.
 
 [Docker Hub](https://hub.docker.com/r/rhysbailey/prometheus-frigate-exporter)
 
