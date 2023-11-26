@@ -23,9 +23,9 @@ class CustomCollector(object):
         self.stats_url = _url
         self.process_stats = {}
 
-    def add_metric_process(self, metric, stats, camera_name, pid_name, process_name, cpu_or_memory, process_type):
+    def add_metric_process(self, metric, camera_stats, camera_name, pid_name, process_name, cpu_or_memory, process_type):
         try:
-            pid = str(stats[camera_name][pid_name])
+            pid = str(camera_stats[pid_name])
             label_values = [pid, camera_name, process_name, process_type]
             metric.add_metric(label_values, self.process_stats[pid][cpu_or_memory])
             del self.process_stats[pid][cpu_or_memory]
@@ -69,13 +69,13 @@ class CustomCollector(object):
             add_metric(skipped_fps, camera_name, camera_stats, 'skipped_fps')
             add_metric(detection_enabled, camera_name, camera_stats, 'detection_enabled')
 
-            self.add_metric_process(cpu_usages, stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'cpu', 'Camera')
-            self.add_metric_process(cpu_usages, stats, camera_name, 'capture_pid', 'capture', 'cpu', 'Camera')
-            self.add_metric_process(cpu_usages, stats, camera_name, 'pid', 'detect', 'cpu', 'Camera')
+            self.add_metric_process(cpu_usages, camera_stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'cpu', 'Camera')
+            self.add_metric_process(cpu_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'cpu', 'Camera')
+            self.add_metric_process(cpu_usages, camera_stats, camera_name, 'pid', 'detect', 'cpu', 'Camera')
 
-            self.add_metric_process(mem_usages, stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'mem', 'Camera')
-            self.add_metric_process(mem_usages, stats, camera_name, 'capture_pid', 'capture', 'mem', 'Camera')
-            self.add_metric_process(mem_usages, stats, camera_name, 'pid', 'detect', 'mem', 'Camera')
+            self.add_metric_process(mem_usages, camera_stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'mem', 'Camera')
+            self.add_metric_process(mem_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'mem', 'Camera')
+            self.add_metric_process(mem_usages, camera_stats, camera_name, 'pid', 'detect', 'mem', 'Camera')
 
         yield camera_fps
         yield detection_fps
