@@ -208,10 +208,11 @@ if __name__ == '__main__':
             "e.g. FRIGATE_STATS_URL=http://<your-frigate-ip>:5000/api/stats")
         exit()
 
-    start_http_server(9100)
+    port = int(os.environ.get('PORT', 9100))
+    start_http_server(port)
 
     logging.info('Started, Frigate API URL: ' + sys.argv[1])
-    logging.info('Metrics at: http://localhost:9100/metrics')
+    logging.info('Metrics at: http://localhost:' + str(port) + '/metrics')
 
     while True:
         time.sleep(1)
