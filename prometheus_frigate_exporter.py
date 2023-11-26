@@ -6,6 +6,7 @@ import re
 import time
 import sys
 import logging
+import os
 
 
 def add_metric(metric, label, stats, key, multiplier=1.0):
