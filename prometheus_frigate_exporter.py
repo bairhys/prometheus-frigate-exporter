@@ -12,7 +12,7 @@ def add_metric(metric, label, stats, key, multiplier=1.0):
     try:
         string = str(stats[key])
         value = float(re.findall(r'\d+', string)[0])
-        metric.add_metric([label], value * multiplier)
+        metric.add_metric(label, value * multiplier)
     except (KeyError, TypeError, IndexError):
         pass
 
@@ -27,6 +27,11 @@ class CustomCollector(object):
         try:
             pid = str(camera_stats[pid_name])
             label_values = [pid, camera_name, process_name, process_type]
+            try:
+                # new frigate:0.13.0-beta3 stat 'cmdline'
+                label_values.append(self.process_stats[pid]['cmdline'])
+            except KeyError:
+                pass
             metric.add_metric(label_values, self.process_stats[pid][cpu_or_memory])
             del self.process_stats[pid][cpu_or_memory]
         except (KeyError, TypeError, IndexError):
@@ -34,13 +39,16 @@ class CustomCollector(object):
 
     def collect(self):
         stats = json.loads(urlopen(self.stats_url).read())
-        self.process_stats = stats['cpu_usages']
+        try:
+            self.process_stats = stats['cpu_usages']
+        except KeyError:
+            pass
 
         # process stats for cameras, detectors and other
         cpu_usages = GaugeMetricFamily('frigate_cpu_usage_percent', 'Process CPU usage %',
-                                       labels=['pid', 'name', 'process', 'type'])
+                                       labels=['pid', 'name', 'process', 'type', 'cmdline'])
         mem_usages = GaugeMetricFamily('frigate_mem_usage_percent', 'Process memory usage %',
-                                       labels=['pid', 'name', 'process', 'type'])
+                                       labels=['pid', 'name', 'process', 'type', 'cmdline'])
 
         # camera stats
         camera_fps = GaugeMetricFamily('frigate_camera_fps', 'Frames per second being consumed from your camera.',
@@ -63,11 +71,11 @@ class CustomCollector(object):
             pass
 
         for camera_name, camera_stats in cameras.items():
-            add_metric(camera_fps, camera_name, camera_stats, 'camera_fps')
-            add_metric(detection_fps, camera_name, camera_stats, 'detection_fps')
-            add_metric(process_fps, camera_name, camera_stats, 'process_fps')
-            add_metric(skipped_fps, camera_name, camera_stats, 'skipped_fps')
-            add_metric(detection_enabled, camera_name, camera_stats, 'detection_enabled')
+            add_metric(camera_fps, [camera_name], camera_stats, 'camera_fps')
+            add_metric(detection_fps, [camera_name], camera_stats, 'detection_fps')
+            add_metric(process_fps, [camera_name], camera_stats, 'process_fps')
+            add_metric(skipped_fps, [camera_name], camera_stats, 'skipped_fps')
+            add_metric(detection_enabled, [camera_name], camera_stats, 'detection_enabled')
 
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'cpu', 'Camera')
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'cpu', 'Camera')
@@ -100,9 +108,9 @@ class CustomCollector(object):
 
         try:
             for detector_name, detector_stats in stats['detectors'].items():
-                add_metric(detector_inference_speed, detector_name, detector_stats, 'inference_speed',
+                add_metric(detector_inference_speed, [detector_name], detector_stats, 'inference_speed',
                            0.001)  # ms to seconds
-                add_metric(detector_detection_start, detector_name, detector_stats, 'detection_start')
+                add_metric(detector_detection_start, [detector_name], detector_stats, 'detection_start')
                 self.add_metric_process(cpu_usages, stats['detectors'], detector_name, 'pid', 'detect', 'cpu',
                                         'Detector')
                 self.add_metric_process(mem_usages, stats['detectors'], detector_name, 'pid', 'detect', 'mem',
@@ -116,8 +124,17 @@ class CustomCollector(object):
         # remaining process stats
         try:
             for process_id, pid_stats in self.process_stats.items():
-                add_metric(cpu_usages, process_id, pid_stats, 'cpu')
-                add_metric(mem_usages, process_id, pid_stats, 'mem')
+                label = [process_id]  # pid label
+                try:
+                    # new frigate:0.13.0-beta3 stat 'cmdline'
+                    label.append(pid_stats['cmdline'])  # name label
+                    label.append(pid_stats['cmdline'])  # process label
+                    label.append('Other')  # type label
+                    label.append(pid_stats['cmdline'])  # cmdline label
+                except KeyError:
+                    pass
+                add_metric(cpu_usages, label, pid_stats, 'cpu')
+                add_metric(mem_usages, label, pid_stats, 'mem')
         except KeyError:
             pass
 
@@ -130,8 +147,8 @@ class CustomCollector(object):
 
         try:
             for gpu_name, gpu_stats in stats['gpu_usages'].items():
-                add_metric(gpu_usages, gpu_name, gpu_stats, 'gpu')
-                add_metric(gpu_usages, gpu_name, gpu_stats, 'mem')
+                add_metric(gpu_usages, [gpu_name], gpu_stats, 'gpu')
+                add_metric(gpu_usages, [gpu_name], gpu_stats, 'mem')
         except KeyError:
             pass
 
@@ -145,8 +162,8 @@ class CustomCollector(object):
 
         try:
             service_stats = stats['service']
-            add_metric(uptime_seconds, '', service_stats, 'uptime')
-            add_metric(last_updated_timestamp, '', service_stats, 'last_updated')
+            add_metric(uptime_seconds, [''], service_stats, 'uptime')
+            add_metric(last_updated_timestamp, [''], service_stats, 'last_updated')
 
             info = {'latest_version': stats['service']['latest_version'], 'version': stats['service']['version']}
             yield InfoMetricFamily('frigate_service', 'Frigate version info', value=info)
@@ -166,9 +183,9 @@ class CustomCollector(object):
 
         try:
             for storage_path, storage_stats in stats['service']['storage'].items():
-                add_metric(storage_free, storage_path, storage_stats, 'free', 1e6)  # MB to bytes
-                add_metric(storage_total, storage_path, storage_stats, 'total', 1e6)  # MB to bytes
-                add_metric(storage_used, storage_path, storage_stats, 'used', 1e6)  # MB to bytes
+                add_metric(storage_free, [storage_path], storage_stats, 'free', 1e6)  # MB to bytes
+                add_metric(storage_total, [storage_path], storage_stats, 'total', 1e6)  # MB to bytes
+                add_metric(storage_used, [storage_path], storage_stats, 'used', 1e6)  # MB to bytes
                 storage_mount_type.add_metric(storage_path, {'mount_type': storage_stats['mount_type']})
         except KeyError:
             pass
