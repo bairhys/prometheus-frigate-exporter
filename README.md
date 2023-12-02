@@ -26,6 +26,8 @@ docker run \
     rhysbailey/prometheus-frigate-exporter
 ```
 
+The default internal exporter port can be modified with `-e "PORT=9100"`
+
 Metrics are available at http://localhost:9100/metrics
 
 ### Setup Prometheus
