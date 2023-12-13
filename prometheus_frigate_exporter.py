@@ -40,7 +40,12 @@ class CustomCollector(object):
             pass
 
     def collect(self):
-        stats = json.loads(urlopen(self.stats_url).read())
+        try:
+            stats = json.loads(urlopen(self.stats_url).read())
+        except error.URLError as e:
+            logging.error("URLError while opening Frigate stats url %s: %s", self.stats_url, e)
+            return
+                
         try:
             self.process_stats = stats['cpu_usages']
         except KeyError:
