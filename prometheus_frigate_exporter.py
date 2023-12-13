@@ -1,12 +1,13 @@
-from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, REGISTRY
-from prometheus_client import start_http_server
-from urllib.request import urlopen
 import json
 import re
 import time
 import sys
 import logging
 import os
+from urllib.request import urlopen
+from urllib import error
+from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, REGISTRY
+from prometheus_client import start_http_server
 
 
 def add_metric(metric, label, stats, key, multiplier=1.0):
@@ -199,21 +200,20 @@ class CustomCollector(object):
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
-
     try:
-        url = str(os.environ.get('FRIGATE_STATS_URL', 'http://localhost:5000/api/stats'))
-        REGISTRY.register(CustomCollector(url))
-    except IndexError:
+        url = os.environ['FRIGATE_STATS_URL']
+    except KeyError:
         logging.error(
             "Provide Frigate stats url as environment variable to container, "
             "e.g. FRIGATE_STATS_URL=http://<your-frigate-ip>:5000/api/stats")
-        exit()
+        sys.exit()
 
+    REGISTRY.register(CustomCollector(url))
     port = int(os.environ.get('PORT', 9100))
     start_http_server(port)
 
-    logging.info('Started, Frigate API URL: ' + url)
-    logging.info('Metrics at: http://localhost:' + str(port) + '/metrics')
+    logging.info('Started, Frigate API URL: %s', url)
+    logging.info('Metrics at: http://localhost:%d/metrics', port)
 
     while True:
         time.sleep(1)
