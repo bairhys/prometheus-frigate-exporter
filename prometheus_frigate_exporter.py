@@ -6,7 +6,7 @@ import logging
 import os
 from urllib.request import urlopen
 from urllib import error
-from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, REGISTRY
+from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, CounterMetricFamily, REGISTRY
 from prometheus_client import start_http_server
 
 
@@ -24,6 +24,8 @@ class CustomCollector(object):
     def __init__(self, _url):
         self.stats_url = _url
         self.process_stats = {}
+        self.previous_event_id = None
+        self.all_events = {}
 
     def add_metric_process(self, metric, camera_stats, camera_name, pid_name, process_name, cpu_or_memory, process_type):
         try:
@@ -201,7 +203,47 @@ class CustomCollector(object):
         yield storage_mount_type
         yield storage_total
         yield storage_used
+        
+        # count events
+        
+        try:
+            # change url from stats to events
+            events = json.loads(urlopen(self.stats_url.replace('stats', 'events')).read())
+        except error.URLError as e:
+            logging.error("URLError while opening Frigate events url %s: %s", self.stats_url, e)
+            return
+        
+        if not self.previous_event_id:
+            # ignore all previous events on startup
+            self.previous_event_id = events[0]['id']
+        
+        camera_events = CounterMetricFamily('frigate_camera_events', 'Count of camera events since exporter started', labels=['camera', 'label'])
+        
+        for event in events:
+            # break if event already counted
+            if event['id'] == self.previous_event_id:
+                break
 
+            # count event in a dict
+            try:
+                cam = self.all_events[event['camera']]
+                try:
+                    cam[event['label']] += 1
+                except KeyError:
+                    # create label dict if not exists
+                    cam.update({event['label']: 1 })
+            except KeyError:
+                # create camera and label dict if not exists
+                self.all_events.update({event['camera']: {event['label'] : 1} })
+
+        for camera, cam_dict in self.all_events.items():
+            for label, label_value in cam_dict.items():
+                camera_events.add_metric([camera, label], label_value)
+            
+        self.previous_event_id = events[0]['id']
+        
+        yield camera_events
+        
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
