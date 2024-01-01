@@ -191,7 +191,14 @@ class CustomCollector(object):
         yield uptime_seconds
         yield last_updated_timestamp
 
-        # service->temperatures: no data for me
+        temperatures = GaugeMetricFamily('frigate_device_temperature', 'Device Temperature', labels=['device'])
+        try:
+            for device_name in stats['service']['temperatures']:
+                add_metric(temperatures, [device_name], stats['service']['temperatures'], device_name)
+        except KeyError:
+            pass
+
+        yield temperatures
 
         storage_free = GaugeMetricFamily('frigate_storage_free_bytes', 'Storage free bytes', labels=['storage'])
         storage_mount_type = InfoMetricFamily('frigate_storage_mount_type', 'Storage mount type', labels=['storage'])
