@@ -60,16 +60,20 @@ class CustomCollector(object):
                                        labels=['pid', 'name', 'process', 'type', 'cmdline'])
 
         # camera stats
+        audio_dBFS = GaugeMetricFamily('frigate_audio_dBFS', 'Audio dBFS for camera',
+                                              labels=['camera_name'])
+        audio_rms = GaugeMetricFamily('frigate_audio_rms', 'Audio RMS for camera',
+                                              labels=['camera_name'])
         camera_fps = GaugeMetricFamily('frigate_camera_fps', 'Frames per second being consumed from your camera.',
                                        labels=['camera_name'])
+        detection_enabled = GaugeMetricFamily('frigate_detection_enabled', 'Detection enabled for camera',
+                                              labels=['camera_name'])
         detection_fps = GaugeMetricFamily('frigate_detection_fps', 'Number of times detection is run per second.',
                                           labels=['camera_name'])
         process_fps = GaugeMetricFamily('frigate_process_fps', 'Frames per second being processed by frigate.',
                                         labels=['camera_name'])
         skipped_fps = GaugeMetricFamily('frigate_skipped_fps', 'Frames per second skip for processing by frigate.',
                                         labels=['camera_name'])
-        detection_enabled = GaugeMetricFamily('frigate_detection_enabled', 'Detection enabled for camera',
-                                              labels=['camera_name'])
 
         # read camera stats assuming version < frigate:0.13.0-beta3
         cameras = stats
@@ -80,12 +84,14 @@ class CustomCollector(object):
             pass
 
         for camera_name, camera_stats in cameras.items():
+            add_metric(audio_dBFS, [camera_name], camera_stats, 'audio_dBFS')
+            add_metric(audio_rms, [camera_name], camera_stats, 'audio_rms')
             add_metric(camera_fps, [camera_name], camera_stats, 'camera_fps')
+            add_metric(detection_enabled, [camera_name], camera_stats, 'detection_enabled')
             add_metric(detection_fps, [camera_name], camera_stats, 'detection_fps')
             add_metric(process_fps, [camera_name], camera_stats, 'process_fps')
             add_metric(skipped_fps, [camera_name], camera_stats, 'skipped_fps')
-            add_metric(detection_enabled, [camera_name], camera_stats, 'detection_enabled')
-
+            
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'cpu', 'Camera')
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'cpu', 'Camera')
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'pid', 'detect', 'cpu', 'Camera')
@@ -94,11 +100,13 @@ class CustomCollector(object):
             self.add_metric_process(mem_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'mem', 'Camera')
             self.add_metric_process(mem_usages, camera_stats, camera_name, 'pid', 'detect', 'mem', 'Camera')
 
+        yield audio_dBFS
+        yield audio_rms
         yield camera_fps
+        yield detection_enabled
         yield detection_fps
         yield process_fps
         yield skipped_fps
-        yield detection_enabled
 
         # detector stats
         try:
