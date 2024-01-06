@@ -2,7 +2,16 @@
 
 This is a docker container that runs a Prometheus exporter for [Frigate](https://frigate.video/) stats.
 
-Tested with 0.12.0 and 0.13.0 Beta 5 Frigate docker images.
+Tested with 0.12.0 and 0.13.0 Beta 7 Frigate docker images.
+
+Exports from Frigate API:
+
+- Inference Speed
+- CPU and MEM process stats
+- Camera, detection and skipped FPS 
+- Storage total, used and free
+- Device Temperature (Coral temp)
+- Event counter for each camera label
 
 [Docker Hub](https://hub.docker.com/r/rhysbailey/prometheus-frigate-exporter)
 
