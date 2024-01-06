@@ -25,6 +25,7 @@ class CustomCollector(object):
         self.stats_url = _url
         self.process_stats = {}
         self.previous_event_id = None
+        self.previous_event_start_time = None
         self.all_events = {}
 
     def add_metric_process(self, metric, camera_stats, camera_name, pid_name, process_name, cpu_or_memory, process_type):
@@ -223,7 +224,13 @@ class CustomCollector(object):
         
         try:
             # change url from stats to events
-            events = json.loads(urlopen(self.stats_url.replace('stats', 'events')).read())
+            events_url = self.stats_url.replace('stats', 'events')
+            
+            if self.previous_event_start_time:
+                events_url = events_url + '?after=' + str(self.previous_event_start_time)
+
+            events = json.loads(urlopen(events_url).read())
+
         except error.URLError as e:
             logging.error("URLError while opening Frigate events url %s: %s", self.stats_url, e)
             return
@@ -231,6 +238,7 @@ class CustomCollector(object):
         if not self.previous_event_id:
             # ignore all previous events on startup
             self.previous_event_id = events[0]['id']
+            self.previous_event_start_time = int(events[0]['start_time'])
         
         camera_events = CounterMetricFamily('frigate_camera_events', 'Count of camera events since exporter started', labels=['camera', 'label'])
         
@@ -256,6 +264,7 @@ class CustomCollector(object):
                 camera_events.add_metric([camera, label], label_value)
             
         self.previous_event_id = events[0]['id']
+        self.previous_event_start_time = int(events[0]['start_time'])
         
         yield camera_events
         
