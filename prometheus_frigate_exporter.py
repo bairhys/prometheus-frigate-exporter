@@ -221,7 +221,7 @@ class CustomCollector(object):
         yield storage_used
         
         # count events
-        
+        events = []
         try:
             # change url from stats to events
             events_url = self.stats_url.replace('stats', 'events')
@@ -235,36 +235,44 @@ class CustomCollector(object):
             logging.error("URLError while opening Frigate events url %s: %s", self.stats_url, e)
             return
         
-        if not self.previous_event_id:
-            # ignore all previous events on startup
+        if len(events) > 0:
+            # events[0] is newest event, last element is oldest, don't need to sort
+            
+            if not self.previous_event_id:
+                # ignore all previous events on startup, prometheus might have already counted them
+                self.previous_event_id = events[0]['id']
+                self.previous_event_start_time = int(events[0]['start_time'])
+        
+            for event in events:
+                # break if event already counted
+                if event['id'] == self.previous_event_id:
+                    break
+                
+                # break if event starts before previous event
+                if event['start_time'] < self.previous_event_start_time:
+                    break
+
+                # store counted events in a dict
+                try:
+                    cam = self.all_events[event['camera']]
+                    try:
+                        cam[event['label']] += 1
+                    except KeyError:
+                        # create label dict if not exists
+                        cam.update({event['label']: 1 })
+                except KeyError:
+                    # create camera and label dict if not exists
+                    self.all_events.update({event['camera']: {event['label'] : 1} })
+
+            # don't recount events next time
             self.previous_event_id = events[0]['id']
             self.previous_event_start_time = int(events[0]['start_time'])
         
         camera_events = CounterMetricFamily('frigate_camera_events', 'Count of camera events since exporter started', labels=['camera', 'label'])
-        
-        for event in events:
-            # break if event already counted
-            if event['id'] == self.previous_event_id:
-                break
-
-            # count event in a dict
-            try:
-                cam = self.all_events[event['camera']]
-                try:
-                    cam[event['label']] += 1
-                except KeyError:
-                    # create label dict if not exists
-                    cam.update({event['label']: 1 })
-            except KeyError:
-                # create camera and label dict if not exists
-                self.all_events.update({event['camera']: {event['label'] : 1} })
 
         for camera, cam_dict in self.all_events.items():
             for label, label_value in cam_dict.items():
                 camera_events.add_metric([camera, label], label_value)
-            
-        self.previous_event_id = events[0]['id']
-        self.previous_event_start_time = int(events[0]['start_time'])
         
         yield camera_events
         
