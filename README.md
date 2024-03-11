@@ -9,9 +9,10 @@ Exports from Frigate API:
 - Inference Speed
 - CPU and MEM process stats
 - Camera, detection and skipped FPS 
+- Camera audio stats
 - Storage total, used and free
 - Device Temperature (Coral temp)
-- Event counter for each camera label
+- Event counters for detected labels on each camera
 
 [Docker Hub](https://hub.docker.com/r/rhysbailey/prometheus-frigate-exporter)
 
@@ -38,6 +39,14 @@ docker run \
 The default internal exporter port can be modified with `-e "PORT=9100"`
 
 Metrics are available at http://localhost:9100/metrics
+
+If you want to export network bandwidth stats, include the section below in your Frigate config (see [here](https://docs.frigate.video/configuration/reference)): 
+
+```yml
+telemetry:
+  stats:
+    network_bandwidth: True
+```
 
 ### Setup Prometheus
 

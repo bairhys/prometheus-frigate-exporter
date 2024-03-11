@@ -220,6 +220,32 @@ class CustomCollector(object):
         yield storage_total
         yield storage_used
         
+        # bandwidth stats
+        bandwidth_usages = GaugeMetricFamily('frigate_bandwidth_usages_kBps', 'bandwidth usages kilobytes per second', labels=['pid', 'name', 'process', 'type', 'cmdline'])
+
+        try:
+            for b_pid, b_stats in stats['bandwidth_usages'].items():
+                label = [b_pid]  # pid label
+                try:
+                    n = stats['cpu_usages'][b_pid]['cmdline']
+                    for p_name, p_stats in stats['processes'].items():
+                        if str(p_stats['pid']) == b_pid:
+                            n = p_name
+                            break
+                    
+                    # new frigate:0.13.0-beta3 stat 'cmdline'
+                    label.append(n)  # name label
+                    label.append(stats['cpu_usages'][b_pid]['cmdline'])  # process label
+                    label.append('Other')  # type label
+                    label.append(stats['cpu_usages'][b_pid]['cmdline'])  # cmdline label
+                    add_metric(bandwidth_usages, label, b_stats, 'bandwidth')
+                except KeyError:
+                    pass
+        except KeyError:
+            pass
+
+        yield bandwidth_usages
+        
         # count events
         events = []
         try:
