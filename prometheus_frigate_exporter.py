@@ -138,6 +138,46 @@ class CustomCollector(object):
 
         yield detector_inference_speed
         yield detector_detection_start
+        
+        # detector process stats
+        try:
+            for detector_name, detector_stats in stats['detectors'].items():
+                p_pid = str(detector_stats['pid'])
+                label = [p_pid]  # pid label
+                try:
+                    # new frigate:0.13.0-beta3 stat 'cmdline'
+                    label.append(detector_name)  # name label
+                    label.append(detector_name)  # process label
+                    label.append('detectors')  # type label
+                    label.append(self.process_stats[p_pid]['cmdline'])  # cmdline label
+                    add_metric(cpu_usages, label, self.process_stats[p_pid], 'cpu')
+                    add_metric(mem_usages, label, self.process_stats[p_pid], 'mem')
+                    del self.process_stats[p_pid]
+                except KeyError:
+                    pass
+                
+        except KeyError:
+            pass
+        
+        # other named process stats
+        try:
+            for process_name, process_stats in stats['processes'].items():
+                p_pid = str(process_stats['pid'])
+                label = [p_pid]  # pid label
+                try:
+                    # new frigate:0.13.0-beta3 stat 'cmdline'
+                    label.append(process_name)  # name label
+                    label.append(process_name)  # process label
+                    label.append(process_name)  # type label
+                    label.append(self.process_stats[p_pid]['cmdline'])  # cmdline label
+                    add_metric(cpu_usages, label, self.process_stats[p_pid], 'cpu')
+                    add_metric(mem_usages, label, self.process_stats[p_pid], 'mem')
+                    del self.process_stats[p_pid]
+                except KeyError:
+                    pass
+                
+        except KeyError:
+            pass
 
         # remaining process stats
         try:
