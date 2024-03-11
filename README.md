@@ -2,7 +2,7 @@
 
 This is a docker container that runs a Prometheus exporter for [Frigate](https://frigate.video/) stats.
 
-Tested with 0.12.0 and 0.13.0 Beta 7 Frigate docker images.
+Tested with 0.12.0 and 0.13.2 Frigate docker images.
 
 Exports from Frigate API:
 
@@ -118,7 +118,7 @@ If you don't already have Grafana set up,
 
 Metrics at `<your-prometheus-frigate-exporter-ip>:9100` should look similar to this
 
-```yaml
+```python
 # HELP python_gc_objects_collected_total Objects collected during gc
 # TYPE python_gc_objects_collected_total counter
 python_gc_objects_collected_total{generation="0"} 225.0
