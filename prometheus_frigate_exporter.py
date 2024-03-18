@@ -13,9 +13,9 @@ from prometheus_client import start_http_server
 def add_metric(metric, label, stats, key, multiplier=1.0):
     try:
         string = str(stats[key])
-        value = float(re.findall(r'\d+', string)[0])
+        value = float(re.findall(r'-?\d*\.?\d*', string)[0])
         metric.add_metric(label, value * multiplier)
-    except (KeyError, TypeError, IndexError):
+    except (KeyError, TypeError, IndexError, ValueError):
         pass
 
 
