@@ -267,7 +267,7 @@ class CustomCollector(object):
         yield temperatures
 
         storage_free = GaugeMetricFamily('frigate_storage_free_bytes', 'Storage free bytes', labels=['storage'])
-        storage_mount_type = InfoMetricFamily('frigate_storage_mount_type', 'Storage mount type', labels=['storage'])
+        storage_mount_type = InfoMetricFamily('frigate_storage_mount_type', 'Storage mount type', labels=['mount_type', 'storage'])
         storage_total = GaugeMetricFamily('frigate_storage_total_bytes', 'Storage total bytes', labels=['storage'])
         storage_used = GaugeMetricFamily('frigate_storage_used_bytes', 'Storage used bytes', labels=['storage'])
 
@@ -276,7 +276,7 @@ class CustomCollector(object):
                 add_metric(storage_free, [storage_path], storage_stats, 'free', 1e6)  # MB to bytes
                 add_metric(storage_total, [storage_path], storage_stats, 'total', 1e6)  # MB to bytes
                 add_metric(storage_used, [storage_path], storage_stats, 'used', 1e6)  # MB to bytes
-                storage_mount_type.add_metric(storage_path, {'mount_type': storage_stats['mount_type']})
+                storage_mount_type.add_metric(storage_path, {'mount_type': storage_stats['mount_type'], 'storage': storage_path})
         except KeyError:
             pass
 

@@ -313,10 +313,10 @@ frigate_storage_free_bytes{storage="/media/frigate/recordings"} 2e+09
 frigate_storage_free_bytes{storage="/tmp/cache"} 2e+09
 # HELP frigate_storage_mount_type_info Storage mount type
 # TYPE frigate_storage_mount_type_info gauge
-frigate_storage_mount_type_info{mount_type="tmpfs",storage="/"} 1.0
-frigate_storage_mount_type_info{mount_type="ext4",storage="/"} 1.0
-frigate_storage_mount_type_info{mount_type="ext4",storage="/"} 1.0
-frigate_storage_mount_type_info{mount_type="overlay",storage="/"} 1.0
+frigate_storage_mount_type_info{mount_type="tmpfs",storage="/dev/shm"} 1.0
+frigate_storage_mount_type_info{mount_type="ext4",storage="/media/frigate/clips"} 1.0
+frigate_storage_mount_type_info{mount_type="ext4",storage="/media/frigate/recordings"} 1.0
+frigate_storage_mount_type_info{mount_type="overlay",storage="/tmp/cache"} 1.0
 # HELP frigate_storage_total_bytes Storage total bytes
 # TYPE frigate_storage_total_bytes gauge
 frigate_storage_total_bytes{storage="/dev/shm"} 3e+09
