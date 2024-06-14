@@ -231,7 +231,7 @@ class CustomCollector(object):
         try:
             for gpu_name, gpu_stats in stats['gpu_usages'].items():
                 add_metric(gpu_usages, [gpu_name], gpu_stats, 'gpu')
-                add_metric(gpu_usages, [gpu_name], gpu_stats, 'mem')
+                add_metric(gpu_mem_usages, [gpu_name], gpu_stats, 'mem')
         except KeyError:
             pass
 
