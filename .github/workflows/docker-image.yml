@@ -13,7 +13,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/test-prometheus-frigate-exporter         
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/prometheus-frigate-exporter         
           tags: type=semver,pattern={{version}}     
 
       - name: Set up QEMU
