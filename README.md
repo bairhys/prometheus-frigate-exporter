@@ -2,7 +2,7 @@
 
 This is a docker container that runs a Prometheus exporter for [Frigate](https://frigate.video/) stats.
 
-Tested with 0.12.0 and 0.13.2 Frigate docker images.
+Tested with 0.13.0 and 0.14.0 Frigate docker images.
 
 Exports from Frigate API:
 
