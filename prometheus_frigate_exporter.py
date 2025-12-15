@@ -4,10 +4,12 @@ import time
 import sys
 import logging
 import os
+from datetime import datetime
 from urllib.request import urlopen
 from urllib import error
-from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, CounterMetricFamily, REGISTRY
 from prometheus_client import start_http_server
+from prometheus_client.core import GaugeMetricFamily, InfoMetricFamily, CounterMetricFamily, REGISTRY
+from prometheus_client.registry import Collector
 
 
 def add_metric(metric, label, stats, key, multiplier=1.0):
@@ -17,6 +19,133 @@ def add_metric(metric, label, stats, key, multiplier=1.0):
         metric.add_metric(label, value * multiplier)
     except (KeyError, TypeError, IndexError, ValueError):
         pass
+
+
+class CustomTimestampedGaugeCollector(Collector):
+
+    def __init__(self, _url):
+        self.stats_url = _url
+        self.previous_event_start_time = None
+        self.zero = 0
+        self.non_zero = 0
+
+    def get_values_from_list_dict(self, dict_list):
+        return lambda key: list(set(map(lambda x: x[key], dict_list)))
+
+    def add_metric(self, metric: GaugeMetricFamily, camera: str, label: str, sub_label: str, value: int, time_stamp: int):
+        try:
+            if value > 0:
+                if not sub_label:
+                    logging.info("%s|%s|%s: value: %s" % (camera, label, str(time_stamp), str(value)))
+                else:
+                    logging.info("%s|%s|%s|%s: value: %s" % (camera, label, sub_label, str(time_stamp), str(value)))
+                self.non_zero += 1
+            else:
+                logging.debug("%s|%s|%s: has no value." % (camera, label, str(time_stamp)))
+                self.zero += 1
+            metric.add_metric([camera, label, sub_label], value, time_stamp)
+        except (KeyError, TypeError, IndexError, ValueError):
+            pass
+
+    def collect(self):
+        logging.info("Start processing CustomTimestampedGaugeCollector")
+        events = []
+        self.zero = 0
+        self.non_zero = 0
+        epoch_now = int(datetime.now().timestamp())
+        # get all the current events
+        try:
+            # change url from stats to events
+            events_url = self.stats_url.replace('stats', 'events')
+            if not self.previous_event_start_time:
+                self.previous_event_start_time = epoch_now
+            events_url = events_url + '?include_thumbnails=0&after=' + str(self.previous_event_start_time)
+            events = json.loads(urlopen(events_url).read())
+
+        except error.URLError as e:
+            logging.error("URLError while opening Frigate events url %s: %s", self.stats_url, e)
+            return
+
+        # get all cameras
+        try:
+            # change url from stats to events
+            config_url = self.stats_url.replace('stats', 'config')
+            config = json.loads(urlopen(config_url).read())
+            cameras = list(config['cameras'].keys())
+
+        except error.URLError as e:
+            logging.error("URLError while opening Frigate config url %s: %s", self.stats_url, e)
+            return
+
+        # Get labels assigned to each camera
+        camera_labels = {}
+        try:
+            # change url from stats to events
+            events_url = self.stats_url.replace('stats', 'labels')
+            for c_labels in cameras:
+                label_url = events_url + '?camera=' + c_labels
+                camera_labels[c_labels] = json.loads(urlopen(label_url).read())
+
+        except error.URLError as e:
+            logging.error("URLError while opening Frigate labels url %s: %s", self.stats_url, e)
+            return
+
+        frigate_events = GaugeMetricFamily(
+            'frigate_camera_events_by_camera_label', 'Frigate Events by Camera and Label Metric.',
+            labels=["camera", "label", "sub_label"]
+        )
+
+        sub_label_tracker = {}
+        if len(events) > 0:
+            # loop the camera / labels map
+            for camera, labels in camera_labels.items():
+                # loop each of the labels
+                for label in labels:
+                    hash_key = "%s|%s" % (camera, label)
+                    # look for sub_labels and handle events with sub_labels
+                    cl_events_sl = list(filter(lambda e: e['camera'] == camera
+                                               and e['label'] == label
+                                               and e['sub_label'] is not None, events))
+                    if len(cl_events_sl) > 0:
+                        # get a list of sub_labels for these events
+                        unique_sl = self.get_values_from_list_dict(cl_events_sl)
+                        unique_sl_list = unique_sl('sub_label')
+                        if len(unique_sl_list) > 0:
+                            for sl in unique_sl_list:
+                                logging.info("%s|%s has sub_label: %s " % (camera, label, sl))
+                                cls_events = list(filter(lambda e: e['camera'] == camera
+                                                         and e['label'] == label
+                                                         and e['sub_label'] == sl, events))
+                                if len(cls_events) > 0:
+                                    self.add_metric(frigate_events, camera, label, sl, len(cls_events), int(cls_events[0]['start_time']))
+                                    sub_label_tracker[hash_key] = 1
+                    # Find all the events with the camera / label combination
+                    # this will return 0 to many events
+                    cl_events = list(filter(lambda e: e['camera'] == camera
+                                            and e['label'] == label
+                                            and e['sub_label'] is None, events))
+                    # Did we find any events?
+                    if len(cl_events) > 0:
+                        # Add a metric with the camera/label, number of events and TS from the event
+                        self.add_metric(frigate_events, camera, label, '', len(cl_events), int(cl_events[0]['start_time']))
+                    else:
+                        # no events found and we didn't process any sub_labels for the combination, add a 0 metric
+                        if hash_key not in sub_label_tracker:
+                            self.add_metric(frigate_events, camera, label, '', 0, epoch_now)
+            self.previous_event_start_time = int(events[0]['start_time']) + 1
+        else:
+            # no new events, add 0 metrics
+            logging.info("No new events")
+            for key, values in camera_labels.items():
+                for v in values:
+                    self.add_metric(frigate_events, key, v, "", 0, epoch_now)
+            self.previous_event_start_time = epoch_now
+
+        yield frigate_events
+        logging.info("Added %s non-zero metrics." % str(self.non_zero))
+        logging.info("Added %s zero metrics." % str(self.zero))
+        logging.info("%s frigate_camera_events_by_camera_label." % len(frigate_events.samples))
+        logging.info("Done processing CustomTimestampedGaugeCollector")
 
 
 class CustomCollector(object):
@@ -48,7 +177,7 @@ class CustomCollector(object):
         except error.URLError as e:
             logging.error("URLError while opening Frigate stats url %s: %s", self.stats_url, e)
             return
-                
+
         try:
             self.process_stats = stats['cpu_usages']
         except KeyError:
@@ -62,9 +191,9 @@ class CustomCollector(object):
 
         # camera stats
         audio_dBFS = GaugeMetricFamily('frigate_audio_dBFS', 'Audio dBFS for camera',
-                                              labels=['camera_name'])
+                                       labels=['camera_name'])
         audio_rms = GaugeMetricFamily('frigate_audio_rms', 'Audio RMS for camera',
-                                              labels=['camera_name'])
+                                      labels=['camera_name'])
         camera_fps = GaugeMetricFamily('frigate_camera_fps', 'Frames per second being consumed from your camera.',
                                        labels=['camera_name'])
         detection_enabled = GaugeMetricFamily('frigate_detection_enabled', 'Detection enabled for camera',
@@ -92,7 +221,7 @@ class CustomCollector(object):
             add_metric(detection_fps, [camera_name], camera_stats, 'detection_fps')
             add_metric(process_fps, [camera_name], camera_stats, 'process_fps')
             add_metric(skipped_fps, [camera_name], camera_stats, 'skipped_fps')
-            
+
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'ffmpeg_pid', 'ffmpeg', 'cpu', 'Camera')
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'capture_pid', 'capture', 'cpu', 'Camera')
             self.add_metric_process(cpu_usages, camera_stats, camera_name, 'pid', 'detect', 'cpu', 'Camera')
@@ -108,7 +237,7 @@ class CustomCollector(object):
         yield detection_fps
         yield process_fps
         yield skipped_fps
-        
+
         # bandwidth stats
         bandwidth_usages = GaugeMetricFamily('frigate_bandwidth_usages_kBps', 'bandwidth usages kilobytes per second', labels=['pid', 'name', 'process', 'cmdline'])
 
@@ -121,7 +250,7 @@ class CustomCollector(object):
                         if str(p_stats['pid']) == b_pid:
                             n = p_name
                             break
-                    
+
                     # new frigate:0.13.0-beta3 stat 'cmdline'
                     label.append(n)  # name label
                     label.append(stats['cpu_usages'][b_pid]['cmdline'])  # process label
@@ -163,7 +292,7 @@ class CustomCollector(object):
 
         yield detector_inference_speed
         yield detector_detection_start
-        
+
         # detector process stats
         try:
             for detector_name, detector_stats in stats['detectors'].items():
@@ -180,10 +309,10 @@ class CustomCollector(object):
                     del self.process_stats[p_pid]
                 except KeyError:
                     pass
-                
+
         except KeyError:
             pass
-        
+
         # other named process stats
         try:
             for process_name, process_stats in stats['processes'].items():
@@ -200,7 +329,7 @@ class CustomCollector(object):
                     del self.process_stats[p_pid]
                 except KeyError:
                     pass
-                
+
         except KeyError:
             pass
 
@@ -284,35 +413,35 @@ class CustomCollector(object):
         yield storage_mount_type
         yield storage_total
         yield storage_used
-        
+
         # count events
         events = []
         try:
             # change url from stats to events
             events_url = self.stats_url.replace('stats', 'events')
-            
+
             if self.previous_event_start_time:
-                events_url = events_url + '?after=' + str(self.previous_event_start_time)
+                events_url = events_url + '?include_thumbnails=0&after=' + str(self.previous_event_start_time)
 
             events = json.loads(urlopen(events_url).read())
 
         except error.URLError as e:
             logging.error("URLError while opening Frigate events url %s: %s", self.stats_url, e)
             return
-        
+
         if len(events) > 0:
             # events[0] is newest event, last element is oldest, don't need to sort
-            
+
             if not self.previous_event_id:
                 # ignore all previous events on startup, prometheus might have already counted them
                 self.previous_event_id = events[0]['id']
                 self.previous_event_start_time = int(events[0]['start_time'])
-        
+
             for event in events:
                 # break if event already counted
                 if event['id'] == self.previous_event_id:
                     break
-                
+
                 # break if event starts before previous event
                 if event['start_time'] < self.previous_event_start_time:
                     break
@@ -324,23 +453,28 @@ class CustomCollector(object):
                         cam[event['label']] += 1
                     except KeyError:
                         # create label dict if not exists
-                        cam.update({event['label']: 1 })
+                        cam.update({event['label']: 1})
                 except KeyError:
                     # create camera and label dict if not exists
-                    self.all_events.update({event['camera']: {event['label'] : 1} })
+                    self.all_events.update({event['camera']: {event['label']: 1}})
 
             # don't recount events next time
             self.previous_event_id = events[0]['id']
             self.previous_event_start_time = int(events[0]['start_time'])
-        
-        camera_events = CounterMetricFamily('frigate_camera_events', 'Count of camera events since exporter started', labels=['camera', 'label'])
+
+        camera_events = CounterMetricFamily('frigate_camera_events',
+                                            'Count of camera events since exporter started',
+                                            labels=['camera', 'label'])
 
         for camera, cam_dict in self.all_events.items():
             for label, label_value in cam_dict.items():
                 camera_events.add_metric([camera, label], label_value)
-        
+
         yield camera_events
-        
+
+        logging.info("%s frigate_camera_events." % len(camera_events.samples))
+        logging.info("Done processing CustomCollector")
+
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
@@ -353,11 +487,13 @@ if __name__ == '__main__':
         sys.exit()
 
     REGISTRY.register(CustomCollector(url))
+    REGISTRY.register(CustomTimestampedGaugeCollector(url))
     port = int(os.environ.get('PORT', 9100))
     start_http_server(port)
 
     logging.info('Started, Frigate API URL: %s', url)
     logging.info('Metrics at: http://localhost:%d/metrics', port)
+    logging.info('Running enhanced Prometheus Frigate Exporter')
 
     while True:
         time.sleep(1)
